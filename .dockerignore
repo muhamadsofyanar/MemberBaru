@@ -1,4 +1,6 @@
-data
-__pycache__
-.env
+node_modules
+.next
 .git
+.env
+*.zip
+*.log

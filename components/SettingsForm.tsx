@@ -1,0 +1,8 @@
+"use client";
+import { useState } from "react";
+
+export function SettingsForm({ settings }: { settings: Record<string, string> }) {
+  const [message, setMessage] = useState(""); const [loading, setLoading] = useState(false);
+  async function submit(e: React.FormEvent<HTMLFormElement>) { e.preventDefault(); setLoading(true); try { const values = Object.fromEntries(new FormData(e.currentTarget)); const res = await fetch("/api/admin/settings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(values) }); setLoading(false); setMessage(res.ok ? "Pengaturan berhasil disimpan." : "Gagal menyimpan pengaturan."); } catch { setMessage("Gagal menyimpan: periksa koneksi."); } finally {setLoading(false);} }
+  return <form onSubmit={submit}>{message && <div className={message.startsWith("Gagal") ? "alert alert-error" : "alert alert-success"}>{message}</div>}<div className="field"><label>Nama platform</label><input name="site_name" defaultValue={settings.site_name}/></div><div className="field"><label>Nama bank</label><input name="bank_name" defaultValue={settings.bank_name}/></div><div className="field"><label>Nomor rekening</label><input name="bank_account" defaultValue={settings.bank_account}/></div><div className="field"><label>Nama pemilik rekening</label><input name="bank_holder" defaultValue={settings.bank_holder}/></div><div className="field"><label>WhatsApp admin</label><input name="whatsapp_admin" defaultValue={settings.whatsapp_admin}/></div><button className="btn btn-primary" disabled={loading}>{loading ? "Menyimpan..." : "Simpan Pengaturan"}</button></form>;
+}

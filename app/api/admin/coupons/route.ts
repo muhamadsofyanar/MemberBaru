@@ -1,0 +1,5 @@
+import {db} from "@/lib/db";import {handle,apiUser} from "@/lib/api";import {normalizeCouponInput} from "@/lib/catalog";
+
+export async function GET(){return handle(async()=>{await apiUser(true);const rows=await db.coupon.findMany({orderBy:{createdAt:"desc"},include:{products:{select:{productId:true}},reservations:{include:{order:{select:{status:true}}}}}});return {rows};});}
+
+export async function POST(req:Request){return handle(async()=>{await apiUser(true);const body=await req.json();const parsed=normalizeCouponInput(body);if(parsed.errors.length)return Response.json({errors:parsed.errors},{status:400});const d=parsed.data!;const code=d.code.toUpperCase();const same=await db.coupon.findUnique({where:{code}});if(same)return Response.json({errors:["Kode kupon sudah ada."]},{status:409});const coupon=await db.coupon.create({data:{code,type:d.type,value:d.value,maxUses:d.maxUses,active:d.active,startAt:d.startAt,endAt:d.endAt,products:d.productIds.length?{create:d.productIds.map(pid=>({productId:pid}))}:undefined}});return Response.json({ok:true,id:coupon.id,code:coupon.code},{status:201});});}

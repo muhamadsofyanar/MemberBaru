@@ -1,0 +1,2 @@
+import Link from "next/link"; import { AuthForm } from "@/components/AuthForm";
+export default function Login(){return <main className="auth-shell"><div className="auth-card"><h1>Selamat datang kembali</h1><p>Masuk untuk melanjutkan perjalanan Anda di RizqHub.</p><p><a href="/forgot-password">Lupa password?</a></p><AuthForm mode="login"/><div className="form-note">Belum punya akun? <Link href="/register">Daftar gratis</Link></div></div></main>}

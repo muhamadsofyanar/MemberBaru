@@ -1,0 +1,470 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  MEMBER
+  ADMIN
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  REJECTED
+  EXPIRED
+}
+
+enum MembershipStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+enum CommissionStatus {
+  PENDING
+  APPROVED
+  PAID
+  CANCELLED
+}
+
+enum ProductType {
+  EBOOK
+  TEMPLATE
+  COURSE
+  MEMBERSHIP
+  BUNDLE
+}
+
+enum ProductStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum DiscountType {
+  PERCENT
+  FIXED
+}
+
+enum OrderItemSource {
+  MAIN
+  BUMP
+}
+
+enum GrantKind {
+  ASSET
+  COURSE
+  PLAN
+}
+
+model User {
+  id                 String       @id @default(cuid())
+  name               String
+  email              String       @unique
+  phone              String?
+  sessionVersion     Int          @default(0)
+  isActive           Boolean      @default(true)
+  resetTokens        PasswordReset[]
+  payouts            Payout[]
+  softwareLicenses   SoftwareLicense[]
+  passwordHash       String
+  role               Role         @default(MEMBER)
+  referralCode       String       @unique
+  referredById       String?
+  referredBy         User?        @relation("Referrals", fields: [referredById], references: [id])
+  referrals          User[]       @relation("Referrals")
+  orders             Order[]
+  memberships        Membership[]
+  earnedCommissions  Commission[] @relation("AffiliateCommissions")
+  sourceCommissions  Commission[] @relation("SourceCommissions")
+  lessonProgress     LessonProgress[]
+  entitlements       Entitlement[]
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+}
+
+model Plan {
+  id                 String       @id @default(cuid())
+  name               String
+  slug               String       @unique
+  description        String
+  price               Int
+  durationDays        Int
+  affiliatePercent   Int          @default(20)
+  features            Json
+  isPopular           Boolean      @default(false)
+  isActive            Boolean      @default(true)
+  orders              Order[]
+  memberships         Membership[]
+  courses             Course[]    @relation("PlanCourses")
+  legacyProduct      Product?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+}
+
+model Course {
+  id                 String       @id @default(cuid())
+  title              String
+  slug               String       @unique
+  description        String
+  thumbnail          String?
+  isPublished        Boolean      @default(false)
+  plans              Plan[]       @relation("PlanCourses")
+  modules            Module[]
+  productOwners      Product[]
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+}
+
+model Module {
+  id                 String       @id @default(cuid())
+  courseId           String
+  course             Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  title              String
+  position           Int
+  lessons            Lesson[]
+
+  @@unique([courseId, position])
+}
+
+model Lesson {
+  id                 String       @id @default(cuid())
+  moduleId           String
+  module             Module       @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  title              String
+  content            String
+  videoUrl           String?
+  durationMinutes    Int          @default(5)
+  position           Int
+  isPreview          Boolean      @default(false)
+  progress           LessonProgress[]
+
+  @@unique([moduleId, position])
+}
+
+model LessonProgress {
+  id                 String       @id @default(cuid())
+  userId             String
+  user               User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lessonId           String
+  lesson             Lesson       @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  completedAt        DateTime      @default(now())
+
+  @@unique([userId, lessonId])
+}
+
+model Order {
+  id                 String       @id @default(cuid())
+  softwareLicenses   SoftwareLicense[]
+  invoice            String       @unique
+  userId             String
+  user               User         @relation(fields: [userId], references: [id])
+  planId             String?
+  plan               Plan?        @relation(fields: [planId], references: [id])
+  amount             Int?
+  subtotal           Int?
+  discountTotal      Int?
+  durationDaysSnapshot Int?
+  affiliatePercentSnapshot Int?
+  status             OrderStatus  @default(PENDING)
+  paymentMethod      String       @default("BANK_TRANSFER")
+  paymentProof       String?
+  transferAccount    String?
+  notes              String?
+  paidAt             DateTime?
+  reviewedAt         DateTime?
+  expiresAt          DateTime?
+  proofSubmittedAt   DateTime?
+  idempotencyKey     String?      @unique
+  legacy             Boolean      @default(false)
+  membership         Membership?
+  commission         Commission?
+  items              OrderItem[]
+  grants             OrderGrant[]
+  couponReservation  CouponReservation?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  @@index([userId, status])
+  @@index([expiresAt, status])
+}
+
+model Membership {
+  id                 String           @id @default(cuid())
+  userId             String
+  user               User             @relation(fields: [userId], references: [id])
+  planId             String
+  plan               Plan             @relation(fields: [planId], references: [id])
+  orderId            String            @unique
+  order              Order             @relation(fields: [orderId], references: [id])
+  startsAt           DateTime
+  endsAt             DateTime
+  status             MembershipStatus @default(ACTIVE)
+  createdAt          DateTime         @default(now())
+}
+
+model Commission {
+  id                 String           @id @default(cuid())
+  affiliateId        String
+  affiliate          User             @relation("AffiliateCommissions", fields: [affiliateId], references: [id])
+  sourceUserId       String
+  sourceUser         User             @relation("SourceCommissions", fields: [sourceUserId], references: [id])
+  orderId            String           @unique
+  order              Order            @relation(fields: [orderId], references: [id])
+  amount             Int
+  percent            Int
+  status             CommissionStatus @default(APPROVED)
+  createdAt          DateTime         @default(now())
+  paidAt             DateTime?
+  payoutId           String?
+  payout             Payout? @relation(fields: [payoutId], references: [id])
+}
+
+model Setting {
+  key                String   @id
+  value              String
+  updatedAt          DateTime @updatedAt
+}
+
+model PasswordReset {
+  id String @id @default(cuid())
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  @@index([userId])
+}
+
+enum PayoutStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  PAID
+}
+model Payout {
+  id String @id @default(cuid())
+  userId String
+  user User @relation(fields: [userId], references: [id])
+  amount Int
+  bankName String
+  accountNumber String
+  accountName String
+  status PayoutStatus @default(PENDING)
+  reviewNote String?
+  transferReference String?
+  reviewedById String?
+  createdAt DateTime @default(now())
+  reviewedAt DateTime?
+  paidAt DateTime?
+  commissions Commission[]
+  @@index([userId, status])
+}
+model RateLimit {
+  key String @id
+  hits Int @default(1)
+  expiresAt DateTime
+  @@index([expiresAt])
+}
+
+model Product {
+  id                String        @id @default(cuid())
+  slug              String        @unique
+  type              ProductType
+  status            ProductStatus @default(DRAFT)
+  name              String
+  description       String
+  price             Int
+  affiliatePercent  Int           @default(20)
+  thumbnail         String?
+  features          Json          @default("[]")
+  faq               Json          @default("[]")
+  legacyPlanId      String?       @unique
+  plan              Plan?         @relation(fields: [legacyPlanId], references: [id])
+  courseId          String?
+  course            Course?       @relation(fields: [courseId], references: [id])
+  softwareLicenses  SoftwareLicense[]
+  softwareReleases  SoftwareRelease[]
+  licenseEnabled    Boolean       @default(false)
+  assets            ProductAsset[]
+  bundleOf          BundleItem[]  @relation("BundleComponents")
+  partOfBundle      BundleItem[]  @relation("BundleMember")
+  bumps             ProductBump[] @relation("ProductMain")
+  bumpsOffer        ProductBump?  @relation("ProductBumpOffer")
+  couponRestricted  CouponProduct[]
+  orderItems        OrderItem[]
+  grants            OrderGrant[]
+  entitlements      Entitlement[]
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  @@index([status, type])
+}
+
+model ProductAsset {
+  softwareReleases SoftwareRelease[]
+  id           String   @id @default(cuid())
+  productId    String
+  product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  originalName String
+  mime         String
+  size         Int
+  storageKey   String   @unique
+  createdAt    DateTime @default(now())
+
+  @@index([productId])
+}
+
+model BundleItem {
+  id              String  @id @default(cuid())
+  bundleId        String
+  bundle          Product @relation("BundleComponents", fields: [bundleId], references: [id], onDelete: Cascade)
+  componentId     String
+  component       Product @relation("BundleMember", fields: [componentId], references: [id], onDelete: Cascade)
+  position        Int     @default(0)
+  createdAt       DateTime @default(now())
+
+  @@unique([bundleId, componentId])
+  @@index([bundleId])
+}
+
+model ProductBump {
+  id         String  @id @default(cuid())
+  productId  String  @unique
+  product    Product @relation("ProductMain", fields: [productId], references: [id], onDelete: Cascade)
+  bumpOfferId String @unique
+  bumpOffer  Product @relation("ProductBumpOffer", fields: [bumpOfferId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+}
+
+model Coupon {
+  id          String           @id @default(cuid())
+  code        String           @unique
+  type        DiscountType
+  value       Int
+  active      Boolean          @default(true)
+  maxUses     Int?
+  startAt     DateTime?
+  endAt       DateTime?
+  products    CouponProduct[]
+  reservations CouponReservation[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@index([active])
+}
+
+model CouponProduct {
+  couponId  String
+  productId String
+  coupon    Coupon  @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@id([couponId, productId])
+}
+
+model CouponReservation {
+  id         String   @id @default(cuid())
+  couponId   String
+  coupon     Coupon   @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  orderId    String   @unique
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  usedAt     DateTime?
+  createdAt  DateTime @default(now())
+
+  @@index([couponId])
+}
+
+model OrderItem {
+  id                  String          @id @default(cuid())
+  orderId             String
+  order               Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  source              OrderItemSource @default(MAIN)
+  productSnapshotName String
+  productSnapshotType ProductType
+  productId           String?
+  product             Product?        @relation(fields: [productId], references: [id])
+  price               Int
+  discount            Int             @default(0)
+  netPrice            Int
+  affiliatePercent    Int             @default(0)
+  createdAt           DateTime        @default(now())
+
+  @@index([orderId])
+}
+
+model OrderGrant {
+  id                String    @id @default(cuid())
+  orderId           String
+  order             Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderItemId       String
+  kind              GrantKind
+  grantRefId        String
+  snapshotName      String
+  durationDays      Int?
+  productId         String?
+  product           Product?  @relation(fields: [productId], references: [id])
+  entitlement       Entitlement?
+  createdAt         DateTime  @default(now())
+
+  @@index([orderId])
+  @@index([kind, grantRefId])
+}
+
+model Entitlement {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orderGrantId String   @unique
+  orderGrant  OrderGrant @relation(fields: [orderGrantId], references: [id])
+  kind        GrantKind
+  grantRefId  String
+  productId   String?
+  product     Product?  @relation(fields: [productId], references: [id])
+  createdAt   DateTime  @default(now())
+
+  @@unique([userId, kind, grantRefId])
+  @@index([userId])
+}
+
+model SoftwareLicense {
+ id String @id @default(cuid())
+ key String @unique
+ userId String
+ user User @relation(fields:[userId], references:[id])
+ productId String
+ product Product @relation(fields:[productId], references:[id])
+ orderId String
+ order Order @relation(fields:[orderId], references:[id])
+ status String @default("active")
+ maxSeats Int @default(1)
+ expiresAt DateTime?
+ createdAt DateTime @default(now())
+ activations SoftwareActivation[]
+ @@unique([orderId, productId])
+ @@index([userId])
+}
+model SoftwareActivation {
+ id String @id @default(cuid())
+ licenseId String
+ license SoftwareLicense @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+ domain String
+ lastSeenAt DateTime @default(now())
+ @@unique([licenseId,domain])
+}
+model SoftwareRelease {
+ id String @id @default(cuid())
+ productId String
+ product Product @relation(fields:[productId],references:[id])
+ version String
+ assetId String
+ asset ProductAsset @relation(fields:[assetId],references:[id])
+ sha256 String
+ createdAt DateTime @default(now())
+ @@unique([productId,version])
+}

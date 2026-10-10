@@ -1,30 +1,54 @@
-# RIZQHUB Membership Starter 0.1
-Kode baru, tidak menggunakan source Averion. MVP untuk membership produk software, unduhan ZIP, pembayaran manual, lisensi seumur hidup dengan batas domain, dan distribusi rilis terbaru.
+# RIZQHUB Membership 1.3.0
 
-## Menjalankan lokal
-Python 3.12, tanpa dependency untuk server pengembangan.
-Set ADMIN_EMAIL, ADMIN_PASSWORD (minimal 12 karakter), APP_URL, dan DATA_DIR melalui environment. Jalankan `python app.py`; buka http://localhost:8000. Tidak ada kredensial default. Akun admin dibuat hanya jika environment valid; password environment tidak mengganti password akun yang sudah ada.
+Untuk upgrade app.rizqhub.id, ikuti [UPGRADE-APP-RIZQHUB.md](UPGRADE-APP-RIZQHUB.md). Port terbaru **8000**, private storage **/data/private**, database **PostgreSQL**. Petunjuk lama di bawah menggambarkan paket sebelum penyesuaian.
 
-## Coolify
-1. Ekstrak ZIP dan push ke repository private milik Anda.
-2. Buat Application dengan build pack Dockerfile. Port 8000.
-3. Pilih subdomain baru, misalnya membership.domain-anda, dan aktifkan HTTPS.
-4. Environment: APP_URL=https://subdomain-anda, ADMIN_EMAIL=email-admin-anda, ADMIN_PASSWORD=password-baru-minimal-12-karakter, DATA_DIR=/data.
-5. Pasang persistent volume ke /data; UID 10001 harus dapat menulis. Jangan memasang volume pada /app.
-6. Deploy dan login. Tambahkan produk, unggah ZIP rilis, dan lakukan pembelian uji dengan akun member.
-7. Setelah pembayaran benar-benar diverifikasi, admin menyetujui pesanan. Sistem menerbitkan satu lisensi per pesanan secara idempotent.
-Backup seluruh /data termasuk SQLite, idealnya ketika aplikasi berhenti atau gunakan SQLite backup API. Data tetap ada saat redeploy jika volume terpasang. Gunakan satu instance aplikasi untuk MVP SQLite ini.
+# RizqHub Membership 1.1.0
 
-## API pelanggan
-POST JSON, Content-Type application/json. Simpan key pada server aplikasi pelanggan, bukan JavaScript publik.
-- /api/activate: {"license_key":"KEY","domain":"customer.example"}
-- /api/validate: format sama. Domain harus sudah aktif.
-- /api/deactivate: format sama. Melepaskan slot domain.
-- /api/update: tambahkan "current_version":"1.0.0". Mengembalikan versi terbaru, has_update, SHA-256, download_endpoint.
-- /api/download: format sama. Mengembalikan ZIP jika lisensi aktif dan domain aktif.
-Lihat client_example.py. API memakai identifier domain yang dilaporkan klien, bukan pembuktian kepemilikan DNS. Key adalah rahasia pembawa akses. Aktivasi dan pembatasan seat memakai transaksi SQLite. Batas API 60 permintaan/menit berdasarkan REMOTE_ADDR, tanpa mempercayai X-Forwarded-For; di balik proxy beberapa pengguna dapat berbagi kuota.
+Next.js + PostgreSQL + Prisma. Pembayaran dan pencairan komisi menggunakan transfer bank manual.
 
-## Cakupan dan batas versi awal
-Pembayaran manual; kontak dan instruksi transfer disampaikan admin di luar aplikasi. Paket membership berbasis pembelian produk, bukan langganan waktu. Lisensi lifetime, bisa disuspend, batas seat bisa diatur. Belum ada payment gateway, reset password, email otomatis, MFA, masa berlaku lisensi, maupun release history. Autentikasi belum punya rate limiting login: tambahkan proteksi sebelum peluncuran publik.
-Update hanya distribusi ZIP, tidak mengekstrak atau menjalankan source yang diunggah. Klien contoh memeriksa SHA-256 untuk integritas, bukan tanda tangan digital. Instalasi update manual. has_update membandingkan perbedaan versi, bukan urutan semver. Tambahkan manifest bertanda tangan, backup, migrasi, dan pemulihan sebelum menyediakan updater otomatis. PHP/Python source dapat dimodifikasi penerimanya; pemeriksaan lisensi tidak kebal perubahan.
-Produk baru dan pesanan merupakan data nyata di instance Anda. Paket ini belum dideploy ke VPS Anda. Tidak ada rahasia dari percakapan atau source vendor dalam paket.
+## Fitur
+
+- Registrasi, login/logout, profil, ganti password, reset password email (SMTP), pencabutan sesi lama setelah perubahan password, aktif/nonaktif akun member oleh admin.
+- Admin membuat/mengedit/mengarsipkan paket, harga, masa aktif, komisi, dan manfaat. Riwayat pembelian dipertahankan. Harga/durasi/persentase pesanan baru disimpan saat checkout.
+- Membership aktif setelah pembayaran disetujui; perpanjangan paket sama dimulai setelah akhir masa aktif, paket berbeda dapat aktif bersamaan.
+- Admin mengelola kursus, modul, materi, urutan, video YouTube/Vimeo, pratinjau gratis, status terbit, dan akses per paket. Perubahan mempertahankan ID materi dan progres. Penghapusan materi menghapus progres terkait setelah konfirmasi.
+- Member melihat kelas, materi, dan progres; pratinjau tersedia setelah login tanpa paket. Konten berbayar diperiksa pada server.
+- Affiliate: tautan referral, komisi, pengajuan seluruh saldo tersedia, persetujuan/penolakan admin, pencatatan referensi transfer dan status lunas. Satu pengajuan berjalan per member; komisi dikunci selama pengajuan dan dilepas bila ditolak.
+- Bukti transfer diakses lewat endpoint admin, pembatasan percobaan login/reset, pemeriksaan origin, transaksi pembayaran/pencairan, endpoint kesehatan.
+
+## Jalankan lokal
+
+Prasyarat Node.js 22+, PostgreSQL 16. Salin `.env.example` menjadi `.env`; gunakan host `localhost` pada DATABASE_URL untuk database lokal. Isi AUTH_SECRET acak minimal 32 karakter, ADMIN_EMAIL, ADMIN_PASSWORD minimal 12 karakter (maksimal 72 byte), dan NEXT_PUBLIC_APP_URL sesuai alamat yang dibuka.
+
+```bash
+npm ci
+npm run db:push
+npm run db:seed
+npm run dev
+```
+
+Buka http://localhost:8000. Set NEXT_PUBLIC_APP_URL ke nilai tersebut untuk lokal. Login admin dengan kredensial dari `.env`.
+
+## Deploy dan upgrade
+
+Baca **DEPLOY.md** sebelum mengganti versi yang sudah memiliki data. Docker Compose memakai volume database yang persisten; jangan hapus volume saat upgrade.
+
+## Pengujian
+
+```bash
+npm test
+npm run lint
+npm run build
+```
+
+`tests/integration.mjs` adalah skenario HTTP terhadap database uji sekali pakai yang sudah diseed, bukan database produksi. Lihat `VALIDATION.md` untuk hasil dan batas pengujian.
+
+## Integrasi eksternal
+
+SMTP_HOST, SMTP_PORT, SMTP_SECURE, SMTP_USER, SMTP_PASSWORD dan SMTP_FROM digunakan untuk reset password. Tautan berlaku 30 menit dan hanya dapat digunakan sekali. Jika SMTP belum diisi, halaman menjelaskan bahwa reset email belum tersedia. Tidak ada password/token yang ditampilkan pada respons API.
+
+Starsender bersifat opsional untuk status pembayaran. Isi variabel STARSENDER; sesuaikan payload `lib/notify.ts` dengan akun/provider. Pengiriman gagal dicatat tanpa membatalkan pembayaran yang telah disetujui; belum ada antrean retry otomatis.
+
+## Batas cakupan
+
+Paket ini melengkapi fitur yang disepakati pada kode sumber. Tidak mencakup payment gateway otomatis, transfer bank otomatis, affiliate multilevel, kuis/sertifikat, atau SaaS multitenant. Tidak ada deploy ke akun/domain pengguna yang dilakukan dari paket ini.

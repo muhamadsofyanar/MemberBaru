@@ -1,0 +1,2 @@
+"use client"; import { useState } from "react"; import { useRouter } from "next/navigation";
+export function LessonCompleteButton({lessonId,done}:{lessonId:string,done:boolean}){const [loading,setLoading]=useState(false);const router=useRouter();async function toggle(){setLoading(true);await fetch(`/api/progress/${lessonId}`,{method:done?"DELETE":"POST"});setLoading(false);router.refresh()}return <button onClick={toggle} disabled={loading} className={`btn ${done?"btn-ghost":"btn-primary"}`}>{loading?"Memproses...":done?"✓ Sudah Selesai":"Tandai Selesai"}</button>}

@@ -1,0 +1,2 @@
+import { db } from "@/lib/db"; import { SettingsForm } from "@/components/SettingsForm";
+export default async function Settings(){const rows=await db.setting.findMany();const settings=Object.fromEntries(rows.map(s=>[s.key,s.value]));return <><div className="page-head"><div><h1>Pengaturan</h1><p>Atur identitas dan rekening pembayaran manual.</p></div></div><div className="panel" style={{maxWidth:680}}><SettingsForm settings={settings}/></div></>}

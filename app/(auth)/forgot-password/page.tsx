@@ -1,0 +1,2 @@
+import {ActionForm} from "@/components/ActionForm";import Link from "next/link";
+export default function Forgot(){return <main className="container" style={{maxWidth:520,padding:"50px 20px"}}><div className="panel"><h1>Lupa password</h1><p>Masukkan email akun untuk menerima tautan reset.</p><ActionForm endpoint="/api/auth/forgot-password" fields={[{name:"email",label:"Email",type:"email",required:true}]} label="Kirim tautan reset"/><p><Link href="/login">Kembali masuk</Link></p></div></main>;}

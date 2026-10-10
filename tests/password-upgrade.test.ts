@@ -1,0 +1,3 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {scryptSync} from 'node:crypto';import bcrypt from 'bcryptjs';import {verifyPassword} from '../lib/password';
+test('migrated starter scrypt password accepts original and rejects incorrect password',async()=>{const salt='0123456789abcdef0123456789abcdef';const hash=salt+':'+scryptSync('migration-test-password',salt,64,{N:16384,r:8,p:1}).toString('hex');assert.equal(await verifyPassword('migration-test-password',hash),true);assert.equal(await verifyPassword('wrong',hash),false);});
+test('new bcrypt passwords remain compatible',async()=>{const h=await bcrypt.hash('new-password',4);assert.equal(await verifyPassword('new-password',h),true);assert.equal(await verifyPassword('wrong',h),false);});

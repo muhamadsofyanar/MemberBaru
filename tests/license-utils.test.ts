@@ -1,0 +1,3 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {normalizeDomain,versionGreater} from '../lib/license-utils';
+test('normalizes domains and rejects invalid identifiers',()=>{assert.equal(normalizeDomain('https://CUSTOMER.example/path'),'customer.example');assert.equal(normalizeDomain('customer.example'),'customer.example');assert.throws(()=>normalizeDomain(''));assert.throws(()=>normalizeDomain('bad..example'));assert.throws(()=>normalizeDomain('foo@example!'));});
+test('compares semantic numeric versions without downgrading',()=>{assert.equal(versionGreater('1.10.0','1.9.0'),true);assert.equal(versionGreater('1.0.0','1.0.0'),false);assert.equal(versionGreater('1.0.0','2.0.0'),false);assert.equal(versionGreater('2.0.0','1.999.999'),true);});
